@@ -1,10 +1,30 @@
 from django.shortcuts import render, redirect
 from django.views.generic.base import View
 
+from .storage import get_storage
+
 
 class DynaWizard(View):
 
     http_method_names = ['get', 'post', 'options']
+
+    def dispatch(self, request, *args, **kwargs):
+        self.prefix = self.get_prefix(request, *args, **kwargs)
+        self.storage = get_storage(
+            storage_name=self.storage_name,
+            prefix=self.get_prefix(request, *args, **kwargs)
+            request=request,
+            file_storage=getattr(self, 'file_storage', None),
+        )
+        self.history = self.storage.history
+        self.session = self.storage.session
+        response = super(DynaWizard, self).dispatch(request, *args, **kwargs)
+        self.storage.update_response(response)
+        return response
+
+    def get_prefix(self, request, *args, **kwargs):
+        # TODO: Add some kind of unique id to prefix
+        return self.__class__.__name__
 
     def get(self, request, step=None, **kwargs):
         form = self.get_form_instance(step=step, form_kwargs={})
@@ -52,7 +72,7 @@ class DynaWizard(View):
             'form_data': getattr(form, 'cleaned_data', None),
             'form_files': getattr(form, 'files', None),
         }
-        self.storage.history.append(history_item)
+        self.history.append(history_item)
 
     def after_process_step(self, step=None):
         pass
