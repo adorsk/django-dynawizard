@@ -21,12 +21,10 @@ class DynaWizardGetTests(DynaWizardBaseTests, TestCase):
             request = self.request_factory.get('')
             wiz = DynaWizard()
             result = DynaWizard.as_view()(request, step=step)
-
             wiz.get_form_instance.assert_called_with(
                 step=step,
                 form_kwargs={},
             )
-
             wiz.render_step.assert_called_with(
                 request,
                 step=step,
@@ -34,7 +32,6 @@ class DynaWizardGetTests(DynaWizardBaseTests, TestCase):
                     'form': wiz.get_form_instance.return_value
                 }
             )
-
             self.assertEquals(result, wiz.render_step.return_value)
 
 class DynaWizardPostTests(DynaWizardBaseTests, TestCase):
@@ -55,14 +52,11 @@ class DynaWizardPostTests(DynaWizardBaseTests, TestCase):
             step = 'step'
             request = self.request_factory.post('')
             request.POST = {'key1': 'value1'}
-
             result = DynaWizard.as_view()(request, step=step)
-
             wiz.get_form_instance.assert_called_with(
                 step=step,
                 form_kwargs=request.POST,
             )
-
             wiz.render_step.assert_called_with(
                 request,
                 step=step,
@@ -70,7 +64,6 @@ class DynaWizardPostTests(DynaWizardBaseTests, TestCase):
                     'form': wiz.get_form_instance.return_value,
                 }
             )
-
             self.assertEquals(result, wiz.render_step.return_value)
 
 
@@ -84,6 +77,8 @@ class DynaWizardPostTests(DynaWizardBaseTests, TestCase):
         with patch.multiple(
             DynaWizard,
             get_form_instance=MagicMock(return_value=valid_form),
+            update_history=DEFAULT,
+            after_process_step=DEFAULT,
             get_next_step=DEFAULT,
             redirect_to_step=DEFAULT,
         ) as mocks:
@@ -91,16 +86,24 @@ class DynaWizardPostTests(DynaWizardBaseTests, TestCase):
             step = 'step'
             request = self.request_factory.post('')
             request.POST = {'key1': 'value1'}
-
             result = DynaWizard.as_view()(request, step=step)
-
             wiz.get_form_instance.assert_called_with(
                 step=step,
                 form_kwargs=request.POST,
             )
-
+            wiz.update_history.assert_called_with(
+                step=step,
+                form=valid_form,
+            )
+            wiz.after_process_step.assert_called_with(
+                step=step,
+            )
             wiz.get_next_step.assert_called_with(
                 current_step=step,
             )
-
             self.assertEquals(result, wiz.redirect_to_step.return_value)
+
+class HistoryTests(DynaWizardBaseTests, TestCase):
+    def test_(self):
+        pass
+

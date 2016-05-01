@@ -41,8 +41,21 @@ class DynaWizard(View):
                 'form': form,
             })
         else:
+            self.update_history(step=step, form=form)
+            self.after_process_step(step=step)
             next_step = self.get_next_step(current_step=step)
             return self.redirect_to_step(step=next_step)
+
+    def update_history(self, step=None, form=None):
+        history_item = {
+            'step': step,
+            'form_data': getattr(form, 'cleaned_data', None),
+            'form_files': getattr(form, 'files', None),
+        }
+        self.storage.history.append(history_item)
+
+    def after_process_step(self, step=None):
+        pass
 
     def get_next_step(self, current_step=None):
         pass
