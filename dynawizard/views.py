@@ -8,7 +8,7 @@ class DynaWizard(View):
 
     def get(self, request, step=None, **kwargs):
         form = self.get_form_instance(step=step, form_kwargs={})
-        return self.render_step(step=step, context={
+        return self.render_step(request, step=step, context={
             'form': form,
         })
 
@@ -26,19 +26,20 @@ class DynaWizard(View):
     def get_altered_form_kwargs(self, step=None, form_kwargs={}):
         return form_kwargs
 
-    def render_step(self, step=None, context={}):
+    def render_step(self, request, step=None, context={}):
         altered_context = self.alter_render_context(step=step, context=context)
         template_name = self.get_template_name(step=step)
-        return render(self.request, template_name, context=altered_context)
+        return render(request, template_name, context=altered_context)
 
     def get_template_name(self, step=None):
         pass
 
-    def post(self, step=None):
-        # Generate form kwargs.
-        # form = self.get_form_instance(step=step, form_kwargs=self.request.POST)
-        # If form is invalid:
-            # render step
+    def post(self, request, step=None, **kwargs):
+        form = self.get_form_instance(step=step, form_kwargs=request.POST)
+        if not form.is_valid():
+            return self.render_step(request, step=step, context={
+                'form': form,
+            })
         # Update history.
         # Get next step.
         # if not next_step:
