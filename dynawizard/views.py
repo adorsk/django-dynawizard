@@ -1,8 +1,12 @@
 from django.shortcuts import render
+from django.views.generic.base import View
 
 
-class DynaWizard(object):
-    def get(self, request, step=None):
+class DynaWizard(View):
+
+    http_method_names = ['get', 'post', 'options']
+
+    def get(self, request, step=None, **kwargs):
         form = self.get_form_instance(step=step, form_kwargs={})
         return self.render_step(step=step, context={
             'form': form,
@@ -32,6 +36,7 @@ class DynaWizard(object):
 
     def post(self, step=None):
         # Generate form kwargs.
+        # form = self.get_form_instance(step=step, form_kwargs=self.request.POST)
         # If form is invalid:
             # render step
         # Update history.
