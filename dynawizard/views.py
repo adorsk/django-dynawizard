@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.views.generic.base import View
 
 
@@ -40,10 +40,12 @@ class DynaWizard(View):
             return self.render_step(request, step=step, context={
                 'form': form,
             })
-        # Update history.
-        # Get next step.
-        # if not next_step:
-            # self.done()
-        # else:
-            # Redirect to next_step.
+        else:
+            next_step = self.get_next_step(current_step=step)
+            return self.redirect_to_step(step=next_step)
+
+    def get_next_step(self, current_step=None):
         pass
+
+    def redirect_to_step(self, step=None):
+        redirect(self.base_url, step=step)

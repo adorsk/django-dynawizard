@@ -38,6 +38,7 @@ class DynaWizardGetTests(DynaWizardBaseTests, TestCase):
             self.assertEquals(result, wiz.render_step.return_value)
 
 class DynaWizardPostTests(DynaWizardBaseTests, TestCase):
+
     def test_invalid_form(self):
 
         class InvalidForm():
@@ -71,3 +72,35 @@ class DynaWizardPostTests(DynaWizardBaseTests, TestCase):
             )
 
             self.assertEquals(result, wiz.render_step.return_value)
+
+
+    def test_valid_form(self):
+
+        class ValidForm():
+            def is_valid(self):
+                return True
+        valid_form = ValidForm()
+
+        with patch.multiple(
+            DynaWizard,
+            get_form_instance=MagicMock(return_value=valid_form),
+            get_next_step=DEFAULT,
+            redirect_to_step=DEFAULT,
+        ) as mocks:
+            wiz = DynaWizard()
+            step = 'step'
+            request = self.request_factory.post('')
+            request.POST = {'key1': 'value1'}
+
+            result = DynaWizard.as_view()(request, step=step)
+
+            wiz.get_form_instance.assert_called_with(
+                step=step,
+                form_kwargs=request.POST,
+            )
+
+            wiz.get_next_step.assert_called_with(
+                current_step=step,
+            )
+
+            self.assertEquals(result, wiz.redirect_to_step.return_value)
