@@ -1,0 +1,13 @@
+notes
+
+*.pyc
+.*.swp
+MANIFEST
+build
+dist
+*.egg-info
+docs/_build
+.tox/
+*.egg/
+.coverage
+

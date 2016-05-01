@@ -1,0 +1,6 @@
+[run]
+source = dynawizard
+branch = 1
+
+[report]
+omit = dynawizard/*tests*
