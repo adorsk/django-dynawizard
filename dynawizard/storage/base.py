@@ -1,3 +1,4 @@
+import collections
 from django.core.files.uploadedfile import UploadedFile
 from django.utils.datastructures import MultiValueDict
 from django.utils.functional import lazy_property
@@ -5,18 +6,44 @@ from django.utils import six
 
 from .exceptions import NoFileStorageConfigured
 
-class History(list):
-    def __init__(self, storage=None, items=[]):
-        super(History, self).__init__(items)
-        self.storage = storage
+class History(object):
+    def __init__(self, storage=None, serialized_items=[]):
+        self.serialized_items = serialized_items
+        self.parent_storage = storage
 
     @property
     def previous(self):
         return self[-1]
 
     def append(self, value):
-        super(History, self).append(value)
-        self.storage.data['history'] = self
+        self.serialized_items.append(value)
+        self.parent_storage.data['history'] = self
+
+    def __getitem__(self, key):
+        serialized_item = self.serialized_items[key]
+        if isinstance(serialized_item, collections.Iterable):
+            history_item = [self.deserialize_item(slice_item)
+                            for slice_item in serialized_item]
+        else:
+            history_item = self.deserialize_item(serialized_item)
+        return history_item
+
+    def deserialize_item(self, serialized_item):
+        return HistoryItem(file_storage=self.parent_storage.file_storage,
+                           **serialized_item)
+
+class HistoryItem(object):
+    def __init__(self, step=None, form_data=None, form_files=None,
+                 file_storage=None):
+        self.step = step
+        self.form_data = form_data
+        self.form_files = [
+            LazyUploadedFile(form_file, file_storage=file_storage)
+            for form_file in form_files]
+
+class LazyUploadedFile():
+    def __init__(self, file_storage=None):
+        self.file_storage = file_storage
 
 class BaseStorage(object):
     def __init__(self, prefix, request=None, file_storage=None):
@@ -30,57 +57,31 @@ class BaseStorage(object):
             'session': {},
         }
 
-    def _get_history(self):
-        return History(storage=self, items=self.data['history'])
-    history = lazy_property(_get_history)
+    def update_history(self, step=None, form_data=None, form_files=None):
+        history_item = {
+            'step': step,
+            'form_data': form_data,
+            'form_files': self.store_form_files(form_files)
+        }
+        self.history.append(history_item)
 
-    def get_files(self, step):
-        wizard_files = self.data[self.step_files_key].get(step, {})
-
-        if wizard_files and not self.file_storage:
-            raise NoFileStorageConfigured(
-                "You need to define 'file_storage' in your "
-                "wizard view in order to handle file uploads.")
-
-        files = {}
-        for field, field_dict in six.iteritems(wizard_files):
-            field_dict = field_dict.copy()
-            tmp_name = field_dict.pop('tmp_name')
-            if (step, field) not in self._files:
-                self._files[(step, field)] = UploadedFile(
-                    file=self.file_storage.open(tmp_name), **field_dict)
-            files[field] = self._files[(step, field)]
-        return files or None
-
-    def set_files(self, step, files):
-        if files and not self.file_storage:
-            raise NoFileStorageConfigured(
-                "You need to define 'file_storage' in your "
-                "wizard view in order to handle file uploads.")
-
-        if step not in self.data[self.step_files_key]:
-            self.data[self.step_files_key][step] = {}
-
-        for field, field_file in six.iteritems(files or {}):
-            tmp_filename = self.file_storage.save(field_file.name, field_file)
-            file_dict = {
-                'tmp_name': tmp_filename,
+    def store_form_files(self, form_files):
+        stored_files = []
+        for field, field_file in six.iteritems(form_files or {}):
+            storage_key = self.file_storage.save(field_file.name, field_file)
+            stored_file = {
+                'storage_key': storage_key,
                 'name': field_file.name,
                 'content_type': field_file.content_type,
                 'size': field_file.size,
                 'charset': field_file.charset
             }
-            self.data[self.step_files_key][step][field] = file_dict
+            stored_files.append(stored_file)
+        return stored_files
+
+    def _get_history(self):
+        return History(storage=self, items=self.data['history'])
+    history = lazy_property(_get_history)
 
     def update_response(self, response):
-        def post_render_callback(response):
-            for file in self._get_files():
-                if not file.closed:
-                    file.close()
-            for tmp_file in self._get_tmp_files():
-                self.file_storage.delete(tmp_file)
-
-        if hasattr(response, 'render'):
-            response.add_post_render_callback(post_render_callback)
-        else:
-            post_render_callback(response)
+        pass

@@ -16,14 +16,11 @@ class DynaWizard(View):
             request=request,
             file_storage=getattr(self, 'file_storage', None),
         )
-        self.history = self.storage.history
-        self.session = self.storage.session
         response = super(DynaWizard, self).dispatch(request, *args, **kwargs)
         self.storage.update_response(response)
         return response
 
     def get_prefix(self, request, *args, **kwargs):
-        # TODO: Add some kind of unique id to prefix
         return self.__class__.__name__
 
     def get(self, request, step=None, **kwargs):
@@ -67,12 +64,11 @@ class DynaWizard(View):
             return self.redirect_to_step(step=next_step)
 
     def update_history(self, step=None, form=None):
-        history_item = {
-            'step': step,
-            'form_data': getattr(form, 'cleaned_data', None),
-            'form_files': getattr(form, 'files', None),
-        }
-        self.history.append(history_item)
+        self.storage.update_history(
+            step=step,
+            form_data=getattr(form, 'cleaned_data', None),
+            form_files=getattr(form, 'files', None)
+        )
 
     def after_process_step(self, step=None):
         pass
