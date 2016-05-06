@@ -2,9 +2,7 @@ from .base import BaseStorage
 
 
 class SessionStorage(BaseStorage):
-
-    def __init__(self, *args, **kwargs):
-        super(SessionStorage, self).__init__(*args, **kwargs)
+    def ensure_data_is_initialized(self):
         if self.prefix not in self.request.session:
             self.init_data()
 

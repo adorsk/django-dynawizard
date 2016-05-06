@@ -6,8 +6,7 @@ from .base import BaseStorage
 class CookieStorage(BaseStorage):
     encoder = json.JSONEncoder(separators=(',', ':'))
 
-    def __init__(self, *args, **kwargs):
-        super(CookieStorage, self).__init__(*args, **kwargs)
+    def ensure_data_is_initialized(self):
         self.data = self.load_data()
         if self.data is None:
             self.init_data()
