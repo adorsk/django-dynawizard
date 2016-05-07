@@ -4,11 +4,42 @@ from unittest.mock import MagicMock, patch, DEFAULT
 from django.test.client import RequestFactory
 
 from dynawizard.views import DynaWizard
+from dynawizard.storage.base import LazyFormFiles, History
 
+
+class LazyFormFilesTests(TestCase):
+    def test_get_item(self):
+        """Creates UploadedFile instance w/ result of
+        retrieve_form_file."""
+        mock_retrieved_file = {'id': 'mock_file'}
+        mock_retrieve_form_file = MagicMock(return_value=mock_retrieved_file)
+        mock_stored_files = {'file1': {
+            'name': 'name',
+            'charset': 'charset',
+            'content_type': 'content_type',
+            'size': 'size',
+        }}
+        with patch(
+            'dynawizard.storage.base.UploadedFile',
+            autospec=True
+        ) as UploadedFile:
+            lazy_form_files = LazyFormFiles(
+                retrieve_form_file=mock_retrieve_form_file,
+                stored_files=mock_stored_files,
+            )
+            lazy_form_files['file1']
+            UploadedFile.assert_called_with(
+                file=mock_retrieved_file,
+                **mock_stored_files['file1']
+            )
 
 class DynaWizardBaseTests(object):
     def setUp(self):
         self.request_factory = RequestFactory()
+
+    def get_storage_name_mock(self):
+        return MagicMock(
+            return_value='tests.dynawizardtests.test_storage.TestStorage')
 
 class DynaWizardGetTests(DynaWizardBaseTests, TestCase):
     def test_get(self):
@@ -16,7 +47,8 @@ class DynaWizardGetTests(DynaWizardBaseTests, TestCase):
             DynaWizard,
             get_form_instance=DEFAULT,
             render_step=DEFAULT,
-        ) as mocks:
+            get_storage_name=self.get_storage_name_mock()
+        ):
             step = 'step'
             request = self.request_factory.get('')
             wiz = DynaWizard()
@@ -47,7 +79,8 @@ class DynaWizardPostTests(DynaWizardBaseTests, TestCase):
             DynaWizard,
             get_form_instance=MagicMock(return_value=invalid_form),
             render_step=DEFAULT,
-        ) as mocks:
+            get_storage_name=self.get_storage_name_mock()
+        ):
             wiz = DynaWizard()
             step = 'step'
             request = self.request_factory.post('')
@@ -81,7 +114,8 @@ class DynaWizardPostTests(DynaWizardBaseTests, TestCase):
             after_process_step=DEFAULT,
             get_next_step=DEFAULT,
             redirect_to_step=DEFAULT,
-        ) as mocks:
+            get_storage_name=self.get_storage_name_mock()
+        ):
             wiz = DynaWizard()
             step = 'step'
             request = self.request_factory.post('')

@@ -11,8 +11,8 @@ class DynaWizard(View):
     def dispatch(self, request, *args, **kwargs):
         self.prefix = self.get_prefix(request, *args, **kwargs)
         self.storage = get_storage(
-            storage_name=self.storage_name,
-            prefix=self.get_prefix(request, *args, **kwargs)
+            storage_name=self.get_storage_name(),
+            prefix=self.get_prefix(request, *args, **kwargs),
             request=request,
             file_storage=getattr(self, 'file_storage', None),
         )
@@ -22,6 +22,9 @@ class DynaWizard(View):
 
     def get_prefix(self, request, *args, **kwargs):
         return self.__class__.__name__
+
+    def get_storage_name(self):
+        return 'dynawizard.storage.session.SessionStorage'
 
     def get(self, request, step=None, **kwargs):
         form = self.get_form_instance(step=step, form_kwargs={})

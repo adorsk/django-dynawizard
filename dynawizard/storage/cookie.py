@@ -6,16 +6,14 @@ from .base import BaseStorage
 class CookieStorage(BaseStorage):
     encoder = json.JSONEncoder(separators=(',', ':'))
 
-    def ensure_data_is_initialized(self):
-        self.data = self.load_data()
-        if self.data is None:
-            self.init_data()
-
     def load_data(self):
-        data = self.request.get_signed_cookie(self.prefix, default=None)
-        if data is None:
-            return None
-        return json.loads(data, cls=json.JSONDecoder)
+        serialized_data = self.request.get_signed_cookie(
+            self.prefix, default=None)
+        if serialized_data is None:
+            data = self.init_data()
+        else:
+            data = json.loads(data, cls=json.JSONDecoder)
+        return data
 
     def update_response(self, response):
         super(CookieStorage, self).update_response(response)
