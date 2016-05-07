@@ -4,25 +4,49 @@ from unittest.mock import MagicMock, patch, DEFAULT
 from django.test.client import RequestFactory
 
 from dynawizard.views import DynaWizard
-from dynawizard.storage.base import LazyFormFiles, History
+from dynawizard.storage.base import BaseStorage, LazyFormFiles, History
 
+
+class BaseStorageTests(TestCase):
+    def test_retrieve_form_files(self):
+        with patch('dynawizard.storage.base.LazyFormFiles') as MockFormFiles:
+            base_storage = BaseStorage()
+            mock_stored_form_files = 'mock_stored_form_files'
+            result = base_storage.retrieve_form_files(
+                stored_form_files=mock_stored_form_files)
+            MockFormFiles.assert_called_with(
+                retrieve_form_file=base_storage.retrieve_form_file,
+                stored_form_files=mock_stored_form_files)
+
+    def test_retrieve_form_file(self):
+        mock_opened_file = 'mock_opened_file'
+        class MockFileStorage(object):
+            def __init__(self):
+                self.open = MagicMock(return_value=mock_opened_file)
+        base_storage = BaseStorage(file_storage=MockFileStorage())
+        stored_form_file = {'storage_key': 'storage_key'}
+        result = base_storage.retrieve_form_file(stored_form_file)
+        base_storage.file_storage.open.assert_called_with(
+            stored_form_file['storage_key'])
+        self.assertEquals(result, mock_opened_file)
 
 
 class HistoryTests(TestCase):
     def test_get_item(self):
         mock_serialized_items = [0, 1, 2, 3]
-        mock_deserialize_item = MagicMock(return_value='mock_item')
-        with patch_multiple(
+        mock_deserialized_item = 'mock_deserialized_item'
+        mock_deserialize_item = MagicMock(return_value=mock_deserialized_item)
+        with patch.multiple(
             History,
             deserialize_item=mock_deserialize_item
         ):
-            history = History(serialized_items=mock_seralized_items)
+            history = History(serialized_items=mock_serialized_items)
             item = history[0]
-            self.assertEquals(item, mock_deserialize_item)
+            self.assertEquals(item, mock_deserialized_item)
 
             items = history[0:-1]
             for item in items:
-                self.assertEquals(item, mock_deserialize_item)
+                self.assertEquals(item, mock_deserialized_item)
 
     def test_serialize_item(self):
         mock_stored_form_files = 'mock_stored_form_files'
@@ -60,7 +84,7 @@ class HistoryTests(TestCase):
         }
         deserialized_item = history.deserialize_item(serialized_item)
         mock_storage.retrieve_form_files.assert_called_with(
-            serialized_item['stored_form_files'])
+            stored_form_files=serialized_item['stored_form_files'])
         self.assertEquals(deserialized_item, {
             'step': serialized_item['step'],
             'form_data': serialized_item['form_data'],
@@ -68,11 +92,11 @@ class HistoryTests(TestCase):
         })
 
     def test_iter(self):
-        with patch(
-            History, 
+        with patch.multiple(
+            History,
             __getitem__=MagicMock(return_value='mock_item')
         ):
-            serialized_items = [1,2,3]
+            serialized_items = [1, 2, 3]
             history = History(serialized_items=serialized_items)
             counter = 0
             for item in history:
@@ -211,8 +235,3 @@ class DynaWizardPostTests(DynaWizardBaseTests, TestCase):
                 current_step=step,
             )
             self.assertEquals(result, wiz.redirect_to_step.return_value)
-
-class HistoryTests(DynaWizardBaseTests, TestCase):
-    def test_(self):
-        pass
-

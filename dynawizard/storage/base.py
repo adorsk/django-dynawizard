@@ -7,7 +7,7 @@ FILE_KWARG_NAMES = ['name', 'content_type', 'size', 'charset']
 
 
 class BaseStorage(object):
-    def __init__(self, prefix, request=None, file_storage=None):
+    def __init__(self, prefix='', request=None, file_storage=None):
         self.prefix = 'dynawizard_%s' % prefix
         self.request = request
         self.file_storage = file_storage
@@ -16,7 +16,7 @@ class BaseStorage(object):
 
     def load_data(self):
         """Subclasses will implement this to load persisted data."""
-        pass
+        return self.init_data()
 
     def init_data(self):
         return {
@@ -91,7 +91,7 @@ class History(object):
         return self
 
     def __next__(self):
-        if self._iter_idx > len(self.serialized_items):
+        if self._iter_idx >= len(self.serialized_items):
             raise StopIteration
         else:
             item = self[self._iter_idx]
