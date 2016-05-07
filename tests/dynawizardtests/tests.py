@@ -7,6 +7,79 @@ from dynawizard.views import DynaWizard
 from dynawizard.storage.base import LazyFormFiles, History
 
 
+
+class HistoryTests(TestCase):
+    def test_get_item(self):
+        mock_serialized_items = [0, 1, 2, 3]
+        mock_deserialize_item = MagicMock(return_value='mock_item')
+        with patch_multiple(
+            History,
+            deserialize_item=mock_deserialize_item
+        ):
+            history = History(serialized_items=mock_seralized_items)
+            item = history[0]
+            self.assertEquals(item, mock_deserialize_item)
+
+            items = history[0:-1]
+            for item in items:
+                self.assertEquals(item, mock_deserialize_item)
+
+    def test_serialize_item(self):
+        mock_stored_form_files = 'mock_stored_form_files'
+        class MockStorage(object):
+            def __init__(self):
+                self.store_form_files = MagicMock(
+                    return_value=mock_stored_form_files)
+        mock_storage = MockStorage()
+        history = History(storage=mock_storage)
+        item = {
+            'step': 'step',
+            'form_data': {'k1': 'v1'},
+            'form_files': 'mock_form_files',
+        }
+        serialized_item = history.serialize_item(item)
+        mock_storage.store_form_files.assert_called_with(item['form_files'])
+        self.assertEquals(serialized_item, {
+            'step': item['step'],
+            'form_data': item['form_data'],
+            'stored_form_files': mock_stored_form_files,
+        })
+
+    def test_deserialize_item(self):
+        mock_retrieved_form_files = 'mock_retrieved_form_files'
+        class MockStorage(object):
+            def __init__(self):
+                self.retrieve_form_files = MagicMock(
+                    return_value=mock_retrieved_form_files)
+        mock_storage = MockStorage()
+        history = History(storage=mock_storage)
+        serialized_item = {
+            'step': 'step',
+            'form_data': {'k1': 'v1'},
+            'stored_form_files': 'stored_form_files',
+        }
+        deserialized_item = history.deserialize_item(serialized_item)
+        mock_storage.retrieve_form_files.assert_called_with(
+            serialized_item['stored_form_files'])
+        self.assertEquals(deserialized_item, {
+            'step': serialized_item['step'],
+            'form_data': serialized_item['form_data'],
+            'form_files': mock_retrieved_form_files,
+        })
+
+    def test_iter(self):
+        with patch(
+            History, 
+            __getitem__=MagicMock(return_value='mock_item')
+        ):
+            serialized_items = [1,2,3]
+            history = History(serialized_items=serialized_items)
+            counter = 0
+            for item in history:
+                counter += 1
+            self.assertEquals(counter, len(serialized_items))
+
+
 class LazyFormFilesTests(TestCase):
     def test_get_item(self):
         """Creates UploadedFile instance w/ result of
@@ -32,6 +105,8 @@ class LazyFormFilesTests(TestCase):
                 file=mock_retrieved_file,
                 **mock_stored_files['file1']
             )
+
+
 
 class DynaWizardBaseTests(object):
     def setUp(self):

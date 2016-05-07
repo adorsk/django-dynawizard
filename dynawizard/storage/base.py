@@ -27,7 +27,7 @@ class BaseStorage(object):
     def load_history(self):
         return History(storage=self, serialized_items=self.data['history'])
 
-    def store_form_files(self, form_files):
+    def store_form_files(self, form_files={}):
         stored_files = []
         for field, field_file in six.iteritems(form_files or {}):
             storage_key = self.file_storage.save(field_file.name, field_file)
@@ -38,7 +38,7 @@ class BaseStorage(object):
             stored_files.append(stored_file)
         return stored_files
 
-    def retrieve_form_files(self, stored_form_files=None):
+    def retrieve_form_files(self, stored_form_files={}):
         return LazyFormFiles(
             retrieve_form_file=self.retrieve_form_file,
             stored_form_files=stored_form_files
@@ -52,13 +52,9 @@ class BaseStorage(object):
 
 
 class History(object):
-    def __init__(self, storage=None, serialized_items=[]):
+    def __init__(self, serialized_items=[], storage=None):
         self.serialized_items = serialized_items
         self.storage = storage
-
-    @property
-    def previous(self):
-        return self[-1]
 
     def append_item(self, item=None):
         self.serialized_items.append(self.serialize_item(item))
@@ -77,7 +73,7 @@ class History(object):
         return {
             'step': serialized_item['step'],
             'form_data': serialized_item['form_data'],
-            'form_files': self.storage.proxy_stored_form_files(
+            'form_files': self.storage.retrieve_form_files(
                 stored_form_files=serialized_item['stored_form_files'])
         }
 
