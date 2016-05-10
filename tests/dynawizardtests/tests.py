@@ -1,11 +1,95 @@
 from unittest import TestCase
 from unittest.mock import MagicMock, patch, DEFAULT
 
+from django import forms
 from django.test.client import RequestFactory
 
 from dynawizard.views import DynaWizard
 from dynawizard.storage.base import BaseStorage, LazyFormFiles, History
 
+
+
+
+class DynaWizardIntegrationTest(TestCase):
+    def setUp(self):
+        self.request_factory = RequestFactory()
+
+    def test_flow(self):
+        class Form_0(forms.Form):
+            branch = forms.CharField(required=False)
+
+
+        class Form_1A(forms.Form):
+            next_step = forms.CharField(required=False)
+
+        
+        class TestStorage(BaseStorage):
+            def __init__(self, *args, **kwargs):
+                self.storage_data = self.init_data()
+                super(TestStorage, self).__init__(*args, **kwargs)
+
+            def load_data(self):
+                return self.storage_data
+        test_storage = TestStorage()
+
+        class MyWizard(DynaWizard):
+            def get_storage(self, *args, **kwargs):
+                return test_storage
+
+            def get_form_class(self, step=None):
+                if step == None:
+                    return Form_0
+                if step == '1':
+                    branch = self.storage.history[-1]['form_data']['branch']
+                    if branch == 'A':
+                        return Form_1A
+                    elif branch == 'B':
+                        return Form_1B
+
+            def get_next_step(self, current_step=None):
+                if current_step == None:
+                    return '1'
+                elif current_step == '1':
+                    prev_step_form_data = self.storage.history[-1]['form_data']
+                    next_step = prev_step_form_data['next_step']
+                    return next_step
+
+            def render_step(self, request, step=None, context=None):
+                if step == None:
+                    return 'rendered_0'
+                if step == '1':
+                    return 'rendered_1'
+                if step == 'done':
+                    step_history = ','.join(
+                        [history_item['step']
+                         for history_item in self.storage.history]
+                    )
+                    return step_history
+
+            def redirect_to_step(self, step=None):
+                return 'redirect:' + step
+
+        request_0 = self.request_factory.get('')
+        response_0 = MyWizard.as_view()(request_0, step=None)
+        self.assertEquals(response_0, 'rendered_0')
+
+        request_1 = self.request_factory.post('')
+        request_1.POST = {'branch': 'A'}
+        response_1 = MyWizard.as_view()(request_1, step=None)
+        self.assertEquals(response_1, 'redirect:1')
+
+        request_2 = self.request_factory.get('')
+        response_2 = MyWizard.as_view()(request_2, step='1')
+        self.assertEquals(response_2, 'rendered_1')
+
+        request_3 = self.request_factory.post('')
+        request_3.POST = {'next_step': 'done', 'data': 'fake_data'}
+        response_3 = MyWizard.as_view()(request_3, step='1')
+        self.assertEquals(response_3, 'redirect:done')
+
+        request_4 = self.request_factory.get('')
+        response_4 = MyWizard.as_view()(request_4, step='done')
+        self.assertEquals(response_4, ',1')
 
 class BaseStorageTests(TestCase):
     def test_retrieve_form_files(self):
@@ -110,7 +194,7 @@ class LazyFormFilesTests(TestCase):
         retrieve_form_file."""
         mock_retrieved_file = {'id': 'mock_file'}
         mock_retrieve_form_file = MagicMock(return_value=mock_retrieved_file)
-        mock_stored_files = {'file1': {
+        mock_stored_form_files = {'file1': {
             'name': 'name',
             'charset': 'charset',
             'content_type': 'content_type',
@@ -122,12 +206,12 @@ class LazyFormFilesTests(TestCase):
         ) as UploadedFile:
             lazy_form_files = LazyFormFiles(
                 retrieve_form_file=mock_retrieve_form_file,
-                stored_files=mock_stored_files,
+                stored_form_files=mock_stored_form_files,
             )
             lazy_form_files['file1']
             UploadedFile.assert_called_with(
                 file=mock_retrieved_file,
-                **mock_stored_files['file1']
+                **mock_stored_form_files['file1']
             )
 
 

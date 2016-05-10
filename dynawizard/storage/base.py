@@ -1,4 +1,3 @@
-import collections
 from django.core.files.uploadedfile import UploadedFile
 from django.utils import six
 
@@ -62,7 +61,7 @@ class History(object):
 
     def serialize_item(self, item={}):
         serialized_item = {
-            'step': item.get('step'),
+            'step': (item.get('step') or ''),
             'form_data': item.get('form_data'),
             'stored_form_files': self.storage.store_form_files(
                 item.get('form_files')),
@@ -71,19 +70,18 @@ class History(object):
 
     def deserialize_item(self, serialized_item):
         return {
-            'step': serialized_item['step'],
+            'step': (serialized_item.get('step') or ''),
             'form_data': serialized_item['form_data'],
             'form_files': self.storage.retrieve_form_files(
                 stored_form_files=serialized_item['stored_form_files'])
         }
 
     def __getitem__(self, key):
-        serialized_item = self.serialized_items[key]
-        if isinstance(serialized_item, collections.Iterable):
-            history_item = [self.deserialize_item(slice_item)
-                            for slice_item in serialized_item]
+        if isinstance(key, slice):
+            history_item = [self.deserialize_item(item)
+                            for item in self.serialized_items[key]]
         else:
-            history_item = self.deserialize_item(serialized_item)
+            history_item = self.deserialize_item(self.serialized_items[key])
         return history_item
 
     def __iter__(self):
@@ -102,9 +100,9 @@ class History(object):
 class LazyFormFiles(object):
     """A dict-like object that creates UploadedFile instances
     for stored files."""
-    def __init__(self, retrieve_form_file=None, stored_files={}):
+    def __init__(self, retrieve_form_file=None, stored_form_files={}):
         self.retrieve_form_file = retrieve_form_file
-        self.stored_files = stored_files
+        self.stored_form_files = stored_form_files
         self._uploaded_files = {}
 
     def __getattr__(self, name):
@@ -113,12 +111,12 @@ class LazyFormFiles(object):
         elif name == '__setitem__' or name == '__delitem__':
             raise Exception("LazyFormFiles is read-only")
         else:
-            return getattr(self.stored_files, name)
+            return getattr(self.stored_form_files, name)
 
     def __getitem__(self, key):
         uploaded_file = self._uploaded_files.get(key)
         if not uploaded_file:
-            stored_file = self.stored_files[key]
+            stored_file = self.stored_form_files[key]
             file_kwargs = {file_kwarg: stored_file.get(file_kwarg)
                            for file_kwarg in FILE_KWARG_NAMES}
             uploaded_file = UploadedFile(

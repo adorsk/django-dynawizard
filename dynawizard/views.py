@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect
 from django.views.generic.base import View
 
-from .storage import get_storage
+from . import storage
 
 
 class DynaWizard(View):
@@ -10,15 +10,18 @@ class DynaWizard(View):
 
     def dispatch(self, request, *args, **kwargs):
         self.prefix = self.get_prefix(request, *args, **kwargs)
-        self.storage = get_storage(
+        self.storage = self.get_storage(request, *args, **kwargs)
+        response = super(DynaWizard, self).dispatch(request, *args, **kwargs)
+        self.storage.update_response(response)
+        return response
+
+    def get_storage(self, request, *args, **kwargs):
+        return storage.get_storage(
             storage_name=self.get_storage_name(),
             prefix=self.get_prefix(request, *args, **kwargs),
             request=request,
             file_storage=getattr(self, 'file_storage', None),
         )
-        response = super(DynaWizard, self).dispatch(request, *args, **kwargs)
-        self.storage.update_response(response)
-        return response
 
     def get_prefix(self, request, *args, **kwargs):
         return self.__class__.__name__
@@ -33,10 +36,12 @@ class DynaWizard(View):
         })
 
     def get_form_instance(self, step=None, form_kwargs={}):
+        form_instance = None
         form_class = self.get_form_class(step=step)
-        altered_form_kwargs = self.get_altered_form_kwargs(
-            step=step, form_kwargs=form_kwargs)
-        form_instance = form_class(**altered_form_kwargs)
+        if form_class:
+            altered_form_kwargs = self.get_altered_form_kwargs(
+                step=step, form_kwargs=form_kwargs)
+            form_instance = form_class(altered_form_kwargs)
         return form_instance
 
     def get_form_class(self, step=None):
@@ -56,7 +61,7 @@ class DynaWizard(View):
 
     def post(self, request, step=None, **kwargs):
         form = self.get_form_instance(step=step, form_kwargs=request.POST)
-        if not form.is_valid():
+        if form and not form.is_valid():
             return self.render_step(request, step=step, context={
                 'form': form,
             })
@@ -67,11 +72,11 @@ class DynaWizard(View):
             return self.redirect_to_step(step=next_step)
 
     def update_history(self, step=None, form=None):
-        self.storage.update_history(
-            step=step,
-            form_data=getattr(form, 'cleaned_data', None),
-            form_files=getattr(form, 'files', None)
-        )
+        self.storage.history.append_item({
+            'step': step,
+            'form_data': getattr(form, 'cleaned_data', None),
+            'form_files': getattr(form, 'files', None),
+        })
 
     def after_process_step(self, step=None):
         pass
@@ -79,5 +84,8 @@ class DynaWizard(View):
     def get_next_step(self, current_step=None):
         pass
 
+    def get_view_name(self):
+        return getattr(self, 'view_name')
+
     def redirect_to_step(self, step=None):
-        redirect(self.base_url, step=step)
+        redirect(self.get_view_name, step=step)
