@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>HotClub Gnerator</h2>
+
+<form method="POST">
+    {% csrf_token %}
+    {{form.as_p}}
+    <button name="next_step" type="submit" value="done">Create band</button>
+    <button name="next_step" type="submit" value="instrument">Add Instrument</button>
+</form>
+
+
+{% endblock %}

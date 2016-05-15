@@ -12,6 +12,7 @@ class BaseStorage(object):
         self.file_storage = file_storage
         self.data = self.load_data()
         self.history = self.load_history()
+        self.session = self.load_session()
 
     def load_data(self):
         """Subclasses will implement this to load persisted data."""
@@ -19,12 +20,16 @@ class BaseStorage(object):
 
     def init_data(self):
         return {
-            'history': [],
+            'serialized_history': [],
             'session': {},
         }
 
     def load_history(self):
-        return History(storage=self, serialized_items=self.data['history'])
+        return History(storage=self,
+                       serialized_items=self.data['serialized_history'])
+
+    def load_session(self):
+        return self.data['session']
 
     def store_form_files(self, form_files={}):
         stored_files = []
@@ -51,18 +56,35 @@ class BaseStorage(object):
 
 
 class History(object):
-    def __init__(self, serialized_items=[], storage=None):
+    def __init__(self, bookmarks={}, serialized_items=[], storage=None):
+        self.bookmarks = bookmarks
         self.serialized_items = serialized_items
         self.storage = storage
 
     def append_item(self, item=None):
         self.serialized_items.append(self.serialize_item(item))
-        self.storage.data['history'] = self
+        self.storage.data['serialized_history'] = self.serialized_items
+
+    def add_bookmark(self, key=None, item_idx=None):
+        self.bookmarks[key] = item_idx
+
+    def load_bookmarked_item(self, key=None):
+        item_idx = self.bookmarks.get(key, None)
+        if item_idx is None:
+            return None
+        return self[item_idx]
+
+    def serialize(self):
+        return {
+            'bookmarks': self.bookmarks,
+            'serialized_items': self.serialized_items,
+        }
 
     def serialize_item(self, item={}):
         serialized_item = {
-            'step': (item.get('step') or ''),
+            'extra': item.get('extra'),
             'form_data': item.get('form_data'),
+            'step': (item.get('step') or ''),
             'stored_form_files': self.storage.store_form_files(
                 item.get('form_files')),
         }
@@ -70,10 +92,11 @@ class History(object):
 
     def deserialize_item(self, serialized_item):
         return {
-            'step': (serialized_item.get('step') or ''),
+            'extra': serialized_item['extra'],
             'form_data': serialized_item['form_data'],
             'form_files': self.storage.retrieve_form_files(
-                stored_form_files=serialized_item['stored_form_files'])
+                stored_form_files=serialized_item['stored_form_files']),
+            'step': (serialized_item.get('step') or ''),
         }
 
     def __getitem__(self, key):
@@ -95,6 +118,9 @@ class History(object):
             item = self[self._iter_idx]
             self._iter_idx += 1
             return item
+
+    def __len__(self):
+        return len(self.serialized_items)
 
 
 class LazyFormFiles(object):
